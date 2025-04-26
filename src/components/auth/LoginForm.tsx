@@ -7,24 +7,24 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
 import { Link, useNavigate } from "react-router-dom";
+import { AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { login } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setError(null);
     
     if (!email || !password) {
-      toast({
-        title: "Error",
-        description: "Please enter your email and password",
-        variant: "destructive",
-      });
+      setError("Please enter your email and password");
       return;
     }
 
@@ -44,6 +44,8 @@ export default function LoginForm() {
           message = error.message;
         }
       }
+      
+      setError(message);
       
       toast({
         title: "Error",
@@ -65,6 +67,12 @@ export default function LoginForm() {
       </CardHeader>
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input 

@@ -4,8 +4,14 @@ import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 
+// Extended user type to provide compatibility with both Firebase and Supabase
+export type ExtendedUser = User & {
+  uid: string; // For backward compatibility
+  displayName?: string; // For backward compatibility
+};
+
 type AuthContextType = {
-  currentUser: User | null;
+  currentUser: ExtendedUser | null;
   session: Session | null;
   signup: (email: string, password: string) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
@@ -24,17 +30,29 @@ export function useAuth() {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<ExtendedUser | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+
+  // Convert Supabase User to our ExtendedUser format
+  const enrichUser = (user: User | null): ExtendedUser | null => {
+    if (!user) return null;
+    
+    // Create an extended user with backward compatibility fields
+    return {
+      ...user,
+      uid: user.id, // Map id to uid for compatibility
+      displayName: user.user_metadata?.name || user.email?.split('@')[0] || 'User'
+    };
+  };
 
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
-        setCurrentUser(session?.user ?? null);
+        setCurrentUser(enrichUser(session?.user ?? null));
         
         if (event === 'SIGNED_IN') {
           toast({
@@ -53,7 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      setCurrentUser(session?.user ?? null);
+      setCurrentUser(enrichUser(session?.user ?? null));
       setLoading(false);
     });
 
