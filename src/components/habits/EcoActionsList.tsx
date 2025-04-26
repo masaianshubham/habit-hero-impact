@@ -2,10 +2,9 @@
 import { useState, useEffect } from "react";
 import EcoActionCard from "./EcoActionCard";
 import { ecoActions } from "@/data/ecoActions";
-import { collection, addDoc, getDocs, query, where, Timestamp } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function EcoActionsList() {
   const { currentUser } = useAuth();
@@ -22,19 +21,24 @@ export default function EcoActionsList() {
 
     const fetchLoggedActions = async () => {
       try {
+        setIsLoading(true);
         const startOfDay = new Date(today);
         const endOfDay = new Date(today);
         endOfDay.setHours(23, 59, 59, 999);
 
-        const q = query(
-          collection(db, "ecoLogs"),
-          where("userId", "==", currentUser.uid),
-          where("date", ">=", startOfDay.toISOString()),
-          where("date", "<=", endOfDay.toISOString())
-        );
-        
-        const querySnapshot = await getDocs(q);
-        const actionIds = querySnapshot.docs.map(doc => doc.data().actionId);
+        const { data, error } = await supabase
+          .from('ecoLogs')
+          .select('actionId')
+          .eq('userId', currentUser.uid)
+          .gte('date', startOfDay.toISOString())
+          .lte('date', endOfDay.toISOString());
+
+        if (error) {
+          throw error;
+        }
+
+        // Extract action IDs from the data
+        const actionIds = data?.map(log => log.actionId) || [];
         setLoggedActions(actionIds);
       } catch (error) {
         console.error("Error fetching logged actions:", error);
@@ -59,17 +63,21 @@ export default function EcoActionsList() {
       const action = ecoActions.find(a => a.id === actionId);
       if (!action) return;
 
-      // Add to Firestore
-      await addDoc(collection(db, "ecoLogs"), {
-        userId: currentUser.uid,
-        actionId: actionId,
-        actionName: action.name,
-        points: action.points,
-        date: new Date().toISOString(),
-        notes: notes || "",
-      });
+      // Add to Supabase
+      const { error } = await supabase
+        .from('ecoLogs')
+        .insert({
+          userId: currentUser.uid,
+          actionId: actionId,
+          actionName: action.name,
+          points: action.points,
+          date: new Date().toISOString(),
+          notes: notes || "",
+        });
 
-      // Update local state
+      if (error) throw error;
+
+      // Update local state immediately
       setLoggedActions(prev => [...prev, actionId]);
 
       toast({
@@ -77,29 +85,46 @@ export default function EcoActionsList() {
         description: `You earned ${action.points} eco-points for ${action.name}.`,
       });
       
-      // Update user stats (this would typically be done with a Firestore transaction or cloud function)
-      // This is a simplified version
+      // Update user stats
       try {
-        const statsRef = collection(db, "userStats");
-        const q = query(statsRef, where("userId", "==", currentUser.uid));
-        const querySnapshot = await getDocs(q);
+        // Check if user stats entry exists
+        const { data: existingStats, error: statsCheckError } = await supabase
+          .from('userStats')
+          .select('*')
+          .eq('userId', currentUser.uid)
+          .maybeSingle();
         
-        if (querySnapshot.empty) {
-          // Create new stats doc if it doesn't exist
-          await addDoc(collection(db, "userStats"), {
-            userId: currentUser.uid,
-            totalPoints: action.points,
-            totalCarbonSaved: action.points, // 1 point = 1kg CO2 saved
-            currentStreak: 1,
-            longestStreak: 1,
-            totalActions: 1,
-            lastActionDate: new Date().toISOString(),
-            badges: []
-          });
+        if (statsCheckError) throw statsCheckError;
+        
+        if (!existingStats) {
+          // Create new stats if it doesn't exist
+          const { error: createStatsError } = await supabase
+            .from('userStats')
+            .insert({
+              userId: currentUser.uid,
+              totalPoints: action.points,
+              totalCarbonSaved: action.points, // 1 point = 1kg CO2 saved
+              currentStreak: 1,
+              longestStreak: 1,
+              totalActions: 1,
+              lastActionDate: new Date().toISOString(),
+              badges: []
+            });
+            
+          if (createStatsError) throw createStatsError;
         } else {
-          // Update would happen here - in a real app, this would use a transaction
-          // For now we're just logging
-          console.log("Would update user stats");
+          // Update existing stats
+          const { error: updateStatsError } = await supabase
+            .from('userStats')
+            .update({
+              totalPoints: existingStats.totalPoints + action.points,
+              totalCarbonSaved: existingStats.totalCarbonSaved + action.points,
+              totalActions: existingStats.totalActions + 1,
+              lastActionDate: new Date().toISOString()
+            })
+            .eq('userId', currentUser.uid);
+            
+          if (updateStatsError) throw updateStatsError;
         }
       } catch (error) {
         console.error("Error updating stats:", error);

@@ -1,11 +1,10 @@
 
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { collection, query, where, getDocs } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { EcoLog } from "@/types";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function WeeklyChart() {
   const { currentUser } = useAuth();
@@ -22,19 +21,13 @@ export default function WeeklyChart() {
         const sevenDaysAgo = new Date(today);
         sevenDaysAgo.setDate(today.getDate() - 6);
         
-        const q = query(
-          collection(db, "ecoLogs"),
-          where("userId", "==", currentUser.uid),
-          where("date", ">=", sevenDaysAgo.toISOString())
-        );
+        const { data: logs, error } = await supabase
+          .from('ecoLogs')
+          .select('*')
+          .eq('userId', currentUser.uid)
+          .gte('date', sevenDaysAgo.toISOString());
         
-        const querySnapshot = await getDocs(q);
-        const logs = querySnapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            ...data,
-          } as EcoLog;
-        });
+        if (error) throw error;
 
         // Create array with last 7 days
         const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -48,7 +41,7 @@ export default function WeeklyChart() {
         }
         
         // Sum points by day
-        logs.forEach(log => {
+        logs?.forEach(log => {
           const date = new Date(log.date);
           const dayName = daysOfWeek[date.getDay()];
           weeklyPoints[dayName] = (weeklyPoints[dayName] || 0) + log.points;
@@ -69,6 +62,26 @@ export default function WeeklyChart() {
     };
 
     fetchWeeklyData();
+    
+    // Subscribe to changes in the ecoLogs table
+    const channel = supabase.channel('schema-db-changes')
+      .on('postgres_changes', 
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'ecoLogs',
+          filter: `userId=eq.${currentUser.uid}`
+        }, 
+        () => {
+          // Refetch data when new log is inserted
+          fetchWeeklyData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [currentUser]);
 
   if (loading) {

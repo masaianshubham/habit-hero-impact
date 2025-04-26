@@ -2,10 +2,9 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { collection, query, where, getDocs } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { UserStats } from "@/types";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function ImpactStats() {
   const { currentUser } = useAuth();
@@ -17,14 +16,16 @@ export default function ImpactStats() {
 
     const fetchUserStats = async () => {
       try {
-        const q = query(
-          collection(db, "userStats"),
-          where("userId", "==", currentUser.uid)
-        );
+        const { data, error } = await supabase
+          .from('userStats')
+          .select('*')
+          .eq('userId', currentUser.uid)
+          .maybeSingle();
         
-        const querySnapshot = await getDocs(q);
-        if (!querySnapshot.empty) {
-          setStats(querySnapshot.docs[0].data() as UserStats);
+        if (error) throw error;
+        
+        if (data) {
+          setStats(data as UserStats);
         } else {
           // Create default stats if not found
           setStats({
@@ -45,6 +46,25 @@ export default function ImpactStats() {
     };
 
     fetchUserStats();
+
+    // Subscribe to changes in the userStats table
+    const channel = supabase.channel('schema-db-changes')
+      .on('postgres_changes', 
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'userStats',
+          filter: `userId=eq.${currentUser.uid}`
+        }, 
+        payload => {
+          setStats(payload.new as UserStats);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [currentUser]);
 
   if (loading) {
