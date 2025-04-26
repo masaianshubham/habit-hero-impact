@@ -1,5 +1,4 @@
-
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Header from "@/components/layout/Header";
 import EcoActionsList from "@/components/habits/EcoActionsList";
 import ImpactStats from "@/components/dashboard/ImpactStats";
@@ -9,6 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 export default function Dashboard() {
   const { currentUser } = useAuth();
+  const [refreshKey, setRefreshKey] = useState(0);
   
   // Get user's first name
   const firstName = currentUser?.displayName 
@@ -27,7 +27,7 @@ export default function Dashboard() {
         </p>
         
         {/* Dashboard Stats */}
-        <ImpactStats />
+        <ImpactStats refreshKey={refreshKey} />
         
         {/* Weekly Chart */}
         <WeeklyChart />
@@ -41,7 +41,7 @@ export default function Dashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <EcoActionsList />
+            <EcoActionsList onActionLogged={() => setRefreshKey(k => k + 1)} />
           </CardContent>
         </Card>
       </div>

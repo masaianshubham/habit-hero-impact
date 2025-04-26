@@ -1,11 +1,8 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { badges } from "@/data/badges";
 import { useAuth } from "@/contexts/AuthContext";
-import { collection, query, where, getDocs } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { UserStats } from "@/types";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function BadgeGrid() {
   const { currentUser } = useAuth();
@@ -17,16 +14,13 @@ export default function BadgeGrid() {
 
     const fetchUserBadges = async () => {
       try {
-        const q = query(
-          collection(db, "userStats"),
-          where("userId", "==", currentUser.uid)
-        );
-        
-        const querySnapshot = await getDocs(q);
-        if (!querySnapshot.empty) {
-          const userData = querySnapshot.docs[0].data() as UserStats;
-          setUserBadges(userData.badges || []);
-        }
+        const { data, error } = await supabase
+          .from('userStats')
+          .select('badges')
+          .eq('userId', currentUser.uid)
+          .maybeSingle();
+        if (error) throw error;
+        setUserBadges(data?.badges || []);
       } catch (error) {
         console.error("Error fetching user badges:", error);
       } finally {

@@ -1,8 +1,5 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { collection, getDocs, getDoc, doc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { GlobalStats as GlobalStatsType } from "@/types";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 
@@ -11,31 +8,14 @@ export default function GlobalStats() {
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
-    const fetchGlobalStats = async () => {
-      try {
-        // In a real app, there'd be an aggregation service updating global stats
-        // Here we'll just fetch a mock global stats document
-        const globalStatsDoc = await getDoc(doc(db, "globalStats", "stats"));
-        
-        if (globalStatsDoc.exists()) {
-          setStats(globalStatsDoc.data() as GlobalStatsType);
-        } else {
-          // Create default stats if not found
-          setStats({
-            totalUsers: 0,
-            totalPoints: 0,
-            totalCarbonSaved: 0,
-            totalActions: 0
-          });
-        }
-      } catch (error) {
-        console.error("Error fetching global stats:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchGlobalStats();
+    // Use mock data for now, as globalStats table is not available in Supabase types
+    setStats({
+      totalUsers: 0,
+      totalPoints: 0,
+      totalCarbonSaved: 0,
+      totalActions: 0
+    });
+    setLoading(false);
   }, []);
 
   // Create mock data for the pie chart

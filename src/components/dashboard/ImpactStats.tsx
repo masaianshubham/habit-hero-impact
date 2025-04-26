@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -6,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { UserStats } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
 
-export default function ImpactStats() {
+export default function ImpactStats({ refreshKey }: { refreshKey?: number }) {
   const { currentUser } = useAuth();
   const [stats, setStats] = useState<UserStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -65,7 +64,7 @@ export default function ImpactStats() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [currentUser]);
+  }, [currentUser, refreshKey]);
 
   if (loading) {
     return (

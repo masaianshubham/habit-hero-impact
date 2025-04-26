@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
@@ -6,8 +5,8 @@ import { useToast } from "@/components/ui/use-toast";
 
 // Extended user type to provide compatibility with both Firebase and Supabase
 export type ExtendedUser = User & {
-  uid: string; // For backward compatibility
-  displayName?: string; // For backward compatibility
+  uid: string;
+  displayName?: string;
 };
 
 type AuthContextType = {
