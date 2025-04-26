@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import EcoActionCard from "./EcoActionCard";
 import { ecoActions } from "@/data/ecoActions";
@@ -6,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
-export default function EcoActionsList() {
+export default function EcoActionsList({ onActionLogged }: { onActionLogged?: () => void }) {
   const { currentUser } = useAuth();
   const { toast } = useToast();
   const [loggedActions, setLoggedActions] = useState<string[]>([]);
@@ -126,6 +125,8 @@ export default function EcoActionsList() {
             
           if (updateStatsError) throw updateStatsError;
         }
+        // Call the callback after successful stats update
+        if (onActionLogged) onActionLogged();
       } catch (error) {
         console.error("Error updating stats:", error);
       }
