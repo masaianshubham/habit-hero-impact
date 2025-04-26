@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 export default function LoginForm() {
   const [email, setEmail] = useState("");
@@ -14,6 +14,7 @@ export default function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -30,15 +31,20 @@ export default function LoginForm() {
     try {
       setIsLoading(true);
       await login(email, password);
-      toast({
-        title: "Success!",
-        description: "You are now logged in.",
-      });
+      navigate("/dashboard");
     } catch (error: any) {
       let message = "Failed to log in.";
-      if (error.code === "auth/wrong-password" || error.code === "auth/user-not-found") {
-        message = "Incorrect email or password.";
+      
+      if (error.message) {
+        if (error.message.includes("Invalid login credentials")) {
+          message = "Invalid email or password.";
+        } else if (error.message.includes("Email not confirmed")) {
+          message = "Please confirm your email before logging in.";
+        } else {
+          message = error.message;
+        }
       }
+      
       toast({
         title: "Error",
         description: message,

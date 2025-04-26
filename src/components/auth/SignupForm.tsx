@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 export default function SignupForm() {
   const [email, setEmail] = useState("");
@@ -15,6 +15,7 @@ export default function SignupForm() {
   const [isLoading, setIsLoading] = useState(false);
   const { signup } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -50,17 +51,28 @@ export default function SignupForm() {
     try {
       setIsLoading(true);
       await signup(email, password);
+      
       toast({
         title: "Success!",
-        description: "Your account has been created.",
+        description: "Your account has been created. Please check your email for confirmation.",
       });
+      
+      // Redirect to login page after signup
+      navigate("/login");
     } catch (error: any) {
       let message = "Failed to create an account.";
-      if (error.code === "auth/email-already-in-use") {
-        message = "This email is already registered.";
-      } else if (error.code === "auth/invalid-email") {
-        message = "Invalid email address.";
+      
+      // Handle Supabase specific errors
+      if (error.message) {
+        if (error.message.includes("already registered")) {
+          message = "This email is already registered.";
+        } else if (error.message.includes("invalid email")) {
+          message = "Invalid email address.";
+        } else {
+          message = error.message;
+        }
       }
+      
       toast({
         title: "Error",
         description: message,
